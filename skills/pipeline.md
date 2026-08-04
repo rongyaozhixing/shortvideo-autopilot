@@ -122,6 +122,27 @@ ffmpeg -y -i silent_combined.mp4 -i final.wav -filter_complex
 8. 等待跳转作品管理页，确认"共 N 个作品"出现且状态"审核中"
 9. 发布方案存 `output/<视频名>/douyin_publish.md` 复用
 
+## Step 2.5: 声音克隆（小米 MiMo voiceclone，可选）
+
+用音频样本复刻任意音色（对标账号/真人声音）：
+
+```python
+POST https://api.xiaomimimo.com/v1/chat/completions
+{"model":"mimo-v2.5-tts-voiceclone",
+ "messages":[{"role":"user","content":"东北口音，自然聊天语气"},
+             {"role":"assistant","content":"要朗读的文案"}],
+ "audio":{"format":"wav","voice":"data:audio/wav;base64,<样本base64>"}}
+```
+
+- **样本要求**：mp3/wav，base64 后 ≤10MB，MIME 前缀 `data:audio/wav;base64,`
+- **风格控制**：user message 传自然语言指令（口音/语气/情绪）
+- **坑**：
+  - 克隆接口**限流 429 频繁**（约 1-2 次/分钟），脚本要带等待重试（429 → sleep 70s）
+  - **逐句生成比整段自然**：整段长文克隆容易语气漂移、长句卡顿（实测某 30 字句生成 18.88s 异常）；逐句 + 句间自然停顿更流畅
+  - 长句拆短句：异常长的句子拆成 2 句重生成（"XX。YY。"）
+  - 本地路径含 `E:\` 的预测/样本文件**不要上传 GitHub**（predictions/ 已 gitignore）
+- ⚠️ **版权**：克隆他人声音用于公开内容需授权；个人测试可随意，商用建议用 `mimo-v2.5-tts-voicedesign`（文本描述设计原创相似音色）
+
 ## 踩坑清单（务必注意）
 
 1. **中文路径/文件名**：Windows bash + ffmpeg 对中文名会乱码 → 处理前先转 ASCII 名
