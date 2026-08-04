@@ -21,6 +21,9 @@ node_modules/
 # 日志
 logs/
 
+# 预测数据（含本地路径，个人数据）
+predictions/
+
 # 系统
 .DS_Store
 Thumbs.db
