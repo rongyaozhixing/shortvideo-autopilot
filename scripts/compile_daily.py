@@ -101,11 +101,41 @@ def parse_json(text: str):
     return None
 
 
+# ---------- 去重：已做热点记录 ----------
+DONE_FILE = HOTSPOTS / "done_hotspots.json"
+
+
+def normalize_title(t: str) -> str:
+    """标题规范化：去标点空格，用于去重比对"""
+    import re
+    return re.sub(r"[\s\W]+", "", t)
+
+
+def load_done() -> set:
+    if DONE_FILE.exists():
+        try:
+            return set(json.load(open(DONE_FILE, encoding="utf-8")))
+        except Exception:
+            return set()
+    return set()
+
+
+def save_done(done: set):
+    DONE_FILE.write_text(json.dumps(sorted(done), ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def run_daily_hotspot():
+    """重新采集热点"""
+    import subprocess
+    subprocess.run([sys.executable, str(BASE / "daily_hotspot.py")], capture_output=True)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--date", default="")
     parser.add_argument("--top", type=int, default=4)
     parser.add_argument("--dry", action="store_true", help="只打印不写文件")
+    parser.add_argument("--allow-repeat", action="store_true", help="允许重复热点（跳过去重）")
     args = parser.parse_args()
 
     date = args.date
@@ -118,11 +148,37 @@ def main():
     if not data_file.exists():
         print(f"❌ 无 {data_file}"); sys.exit(1)
 
+    # 时效检查：只接受当天或前一天（--date 指定时跳过）
+    if not args.date:
+        from datetime import datetime, timedelta
+        try:
+            d = datetime.strptime(date, "%Y-%m-%d").date()
+            today = datetime.now().date()
+            if (today - d).days > 1:
+                print(f"⚠️ 热点 {date} 已超过 1 天，重新采集最新热点...")
+                run_daily_hotspot()
+                jsons = sorted(glob.glob(str(HOTSPOTS / "*.json")))
+                if jsons:
+                    date = Path(jsons[-1]).stem
+                    data_file = HOTSPOTS / f"{date}.json"
+        except ValueError:
+            pass
+
     data = json.load(open(data_file, encoding="utf-8"))
-    hot = data.get("hot", data.get("all", []))[: args.top]
+    hot = data.get("hot", data.get("all", []))
     if not hot:
         print("❌ 热点为空"); sys.exit(1)
 
+    # 去重：排除已做过的热点（除非 --allow-repeat）
+    if not args.allow_repeat:
+        done = load_done()
+        before = len(hot)
+        hot = [h for h in hot if normalize_title(h["title"]) not in done]
+        print(f"🔄 去重: {before} -> {len(hot)}（已做过 {before - len(hot)} 条）")
+        if not hot:
+            print("❌ 今天的热点都做过了，建议 --allow-repeat 或扩大 top"); sys.exit(1)
+
+    hot = hot[: args.top]
     hotlist = "\n".join(f"{i+1}. {h['title']}" for i, h in enumerate(hot))
     print(f"🤖 LLM 生成合集文案（{len(hot)} 个热点）...")
     result = call_llm(GENERATE_PROMPT.format(total=len(hot), hotlist=hotlist))
@@ -160,6 +216,13 @@ def main():
     }
     meta_path = HOTSPOTS / f"{date}_daily_meta.json"
     meta_path.write_text(json.dumps(meta_out, ensure_ascii=False, indent=1), encoding="utf-8")
+
+    # 记录已做热点（去重）
+    done = load_done()
+    for h in hot:
+        done.add(normalize_title(h["title"]))
+    save_done(done)
+    print(f"✅ 已记录 {len(hot)} 个热点到去重库（累计 {len(done)} 条）")
 
     print(f"📰 每日热点合集（{date} · {len(hot)} 个热点）")
     print(f"🏷️ 标题: {meta.get('title')}")
