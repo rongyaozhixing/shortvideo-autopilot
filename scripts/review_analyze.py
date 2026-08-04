@@ -59,7 +59,7 @@ def call_llm(prompt: str, system: str = "") -> str:
     try:
         resp = j.load(urllib.request.urlopen(req, timeout=120))
         msg = resp["choices"][0]["message"]
-        return msg.get("reasoning_content") or msg.get("content") or ""
+        return msg.get("content") or msg.get("reasoning_content") or ""
     except Exception as e:
         return f"⚠️ AI 分析失败: {e}"
 
