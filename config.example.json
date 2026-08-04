@@ -1,0 +1,11 @@
+# 配置示例 —— 复制为 ~/.agnes.json 并填入你的 key
+{
+  "provider": "agnes (Sapiens AI)",
+  "base_url": "https://api.agnes-ai.cn/v1",
+  "api_key": "sk-你的agnes密钥",
+  "models": {
+    "text": "agnes-2.5-flash",
+    "image": "agnes-image-2.1-flash",
+    "video": "agnes-video-v2.0"
+  }
+}
