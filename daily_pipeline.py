@@ -55,6 +55,7 @@ def main():
     parser.add_argument("--voice", default="yunjian", choices=list(VOICES))
     parser.add_argument("--no-material", action="store_true", help="跳过素材抓取")
     parser.add_argument("--no-bgm", action="store_true")
+    parser.add_argument("--allow-repeat", action="store_true", help="允许重复热点（透传给 compile_daily）")
     args = parser.parse_args()
 
     v = VOICES[args.voice]
@@ -77,7 +78,10 @@ def main():
 
     # 2) 生成序号文案
     print("\n📝 生成 LLM 序号文案...")
-    r = run([sys.executable, str(SCRIPTS / "compile_daily.py"), "--date", date, "--top", str(args.top)])
+    compile_cmd = [sys.executable, str(SCRIPTS / "compile_daily.py"), "--date", date, "--top", str(args.top)]
+    if args.allow_repeat:
+        compile_cmd.append("--allow-repeat")
+    r = run(compile_cmd)
     script_file = HOTSPOTS / f"{date}_daily_script.txt"
     if not script_file.exists():
         print("❌ 文案生成失败"); sys.exit(1)
