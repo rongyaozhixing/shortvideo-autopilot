@@ -9,12 +9,20 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 
 MIMO_URL = "https://api.xiaomimimo.com/v1/chat/completions"
 # 从环境变量读取，勿硬编码密钥
-MIMO_KEY = os.environ.get("MIMO_API_KEY", "")
-if not MIMO_KEY:
-    print("⚠️ 请设置环境变量 MIMO_API_KEY（小米 MiMo 平台 API key）")
-    sys.exit(1)
-VOICE = sys.argv[3] if len(sys.argv) > 3 else "冰糖"
-STYLE = "用清晰、自然、适合短视频旁白的语气朗读，语速适中，抑扬顿挫，有讲故事的感觉。"
+try:
+    from config import TTSConfig
+    MIMO_KEY = TTSConfig.MIMO_KEY
+    MIMO_URL = TTSConfig.MIMO_URL
+    VOICE = sys.argv[3] if len(sys.argv) > 3 else TTSConfig.DEFAULT_VOICE
+    STYLE = TTSConfig.STYLE
+    TTSConfig.require_key()
+except ImportError:
+    MIMO_KEY = os.environ.get("MIMO_API_KEY", "")
+    VOICE = sys.argv[3] if len(sys.argv) > 3 else "冰糖"
+    STYLE = "用清晰、自然、适合短视频旁白的语气朗读，语速适中，抑扬顿挫，有讲故事的感觉。"
+    if not MIMO_KEY:
+        print("⚠️ 请设置环境变量 MIMO_API_KEY（小米 MiMo 平台 API key）")
+        sys.exit(1)
 
 
 def tts(text: str) -> bytes | None:
