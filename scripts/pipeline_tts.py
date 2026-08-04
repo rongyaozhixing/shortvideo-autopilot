@@ -26,6 +26,7 @@ except ImportError:
 
 
 def tts(text: str) -> bytes | None:
+    # 主服务：小米 MiMo
     payload = {
         "model": "mimo-v2.5-tts",
         "messages": [
@@ -44,14 +45,54 @@ def tts(text: str) -> bytes | None:
         audio = resp["choices"][0]["message"].get("audio")
         if audio and audio.get("data"):
             return base64.b64decode(audio["data"])
-        print("无音频:", json.dumps(resp, ensure_ascii=False)[:200])
+        print("MiMo 无音频:", json.dumps(resp, ensure_ascii=False)[:150])
     except Exception as e:
-        print("ERR:", str(e)[:150])
+        print(f"MiMo 失败({str(e)[:80]}) -> 尝试备用")
+
+    # 备用 1：edge-tts（免费，零配置；MPT venv 里有）
+    try:
+        import edge_tts
+        import asyncio
+        voice_map = {"冰糖": "zh-CN-XiaoxiaoNeural", "茉莉": "zh-CN-XiaoyiNeural",
+                     "苏打": "zh-CN-YunxiNeural", "白桦": "zh-CN-YunjianNeural"}
+        edge_voice = voice_map.get(VOICE, "zh-CN-XiaoxiaoNeural")
+        tmp = os.path.join(os.path.dirname(out_dir_global), f"_fallback_{os.getpid()}.mp3")
+        asyncio.run(_edge_save(text, edge_voice, tmp))
+        if os.path.exists(tmp):
+            data = open(tmp, "rb").read()
+            os.remove(tmp)
+            return data
+    except Exception as e:
+        print(f"edge-tts 备用失败: {str(e)[:80]}")
+
+    # 备用 2：OpenAI 兼容 TTS（如配置了 OPENAI_API_KEY）
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    if openai_key:
+        try:
+            payload = {"model": "tts-1", "input": text,
+                       "voice": os.environ.get("OPENAI_TTS_VOICE", "alloy"),
+                       "response_format": "wav"}
+            req = urllib.request.Request(
+                os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1") + "/audio/speech",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Authorization": "Bearer " + openai_key, "Content-Type": "application/json"},
+            )
+            return urllib.request.urlopen(req, timeout=120).read()
+        except Exception as e:
+            print(f"OpenAI 备用失败: {str(e)[:80]}")
     return None
 
 
+async def _edge_save(text: str, voice: str, out: str):
+    import edge_tts
+    com = edge_tts.Communicate(text, voice, rate="+0%")
+    await com.save(out)
+
+
 def main():
+    global out_dir_global
     script_path, out_dir = sys.argv[1], sys.argv[2]
+    out_dir_global = out_dir
     lines = [l.strip() for l in open(script_path, encoding="utf-8").read().split("\n") if l.strip()]
     os.makedirs(out_dir, exist_ok=True)
 
