@@ -29,6 +29,54 @@ def _load_dotenv():
 _load_dotenv()
 
 
+def _load_global_configs():
+    """从全局配置文件读取密钥（任何项目通用）：
+    ~/.mimo.json        小米 MiMo（配音）
+    ~/.media_apis.json  Pexels/Pixabay/Coverr（素材）
+    ~/.agnes.json       agnes（生图/识图）
+    """
+    import json as _json
+    home = Path.home()
+
+    # 小米 MiMo
+    p = home / ".mimo.json"
+    if p.exists():
+        try:
+            d = _json.load(open(p, encoding="utf-8"))
+            os.environ.setdefault("MIMO_API_KEY", d.get("api_key", ""))
+            os.environ.setdefault("MIMO_URL", d.get("base_url", "https://api.xiaomimimo.com/v1") + "/chat/completions")
+            os.environ.setdefault("MIMO_MODEL", d.get("models", {}).get("tts", "mimo-v2.5-tts"))
+        except Exception:
+            pass
+
+    # 素材 API
+    p = home / ".media_apis.json"
+    if p.exists():
+        try:
+            d = _json.load(open(p, encoding="utf-8"))
+            pex = d.get("pexels", {})
+            os.environ.setdefault("PEXELS_API_KEY", pex.get("key", ""))
+            pix = d.get("pixabay", {})
+            os.environ.setdefault("PIXABAY_API_KEY", pix.get("key", ""))
+            cov = d.get("coverr", {})
+            os.environ.setdefault("COVERR_API_KEY", cov.get("key", ""))
+        except Exception:
+            pass
+
+    # agnes（生图/识图）
+    p = home / ".agnes.json"
+    if p.exists():
+        try:
+            d = _json.load(open(p, encoding="utf-8"))
+            os.environ.setdefault("AGNES_API_KEY", d.get("api_key", ""))
+            os.environ.setdefault("AGNES_BASE_URL", d.get("base_url", "https://api.agnes-ai.cn/v1"))
+        except Exception:
+            pass
+
+
+_load_global_configs()
+
+
 def _get(key: str, default: str = "", required: bool = False, hint: str = "") -> str:
     val = os.environ.get(key, default)
     if required and not val:
